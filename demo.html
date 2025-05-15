@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>数字块平滑移动动画Demo</title>
+  <style>
+    .board {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      background: #bbada0;
+      margin: 40px auto;
+      border-radius: 8px;
+      display: grid;
+      grid-template-columns: repeat(4, 60px);
+      grid-template-rows: repeat(4, 60px);
+      gap: 10px;
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      background: #eee4da;
+      border-radius: 3px;
+      position: absolute;
+      left: 0;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: bold;
+      color: #776e65;
+      transition: left 0.3s, top 0.3s;
+      z-index: 2;
+    }
+    .bg-cell {
+      width: 60px;
+      height: 60px;
+      background: rgba(238,228,218,0.35);
+      border-radius: 3px;
+      position: absolute;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="board" id="board">
+    <!-- 背景格子 -->
+    <div class="bg-cell" style="left:0;top:0"></div>
+    <div class="bg-cell" style="left:70px;top:0"></div>
+    <div class="bg-cell" style="left:140px;top:0"></div>
+    <div class="bg-cell" style="left:210px;top:0"></div>
+    <div class="bg-cell" style="left:0;top:70px"></div>
+    <div class="bg-cell" style="left:70px;top:70px"></div>
+    <div class="bg-cell" style="left:140px;top:70px"></div>
+    <div class="bg-cell" style="left:210px;top:70px"></div>
+    <div class="bg-cell" style="left:0;top:140px"></div>
+    <div class="bg-cell" style="left:70px;top:140px"></div>
+    <div class="bg-cell" style="left:140px;top:140px"></div>
+    <div class="bg-cell" style="left:210px;top:140px"></div>
+    <div class="bg-cell" style="left:0;top:210px"></div>
+    <div class="bg-cell" style="left:70px;top:210px"></div>
+    <div class="bg-cell" style="left:140px;top:210px"></div>
+    <div class="bg-cell" style="left:210px;top:210px"></div>
+    <!-- 数字块 -->
+    <div class="cell" id="tile" style="left:0;top:0">2</div>
+  </div>
+  <div style="text-align:center;">
+    <button onclick="moveTile()">点击移动数字块</button>
+  </div>
+  <script>
+    // 只演示一个tile的移动
+    const board = document.getElementById('board');
+    let tile = document.createElement('div');
+    tile.className = 'cell';
+    tile.textContent = '2';
+    board.appendChild(tile);
+
+    // 初始位置
+    let pos = {x: 0, y: 0};
+    function setTilePosition(x, y) {
+      tile.style.left = (y * 70) + 'px';
+      tile.style.top = (x * 70) + 'px';
+    }
+    setTilePosition(pos.x, pos.y);
+
+    // 移动到下一个位置
+    function moveTile() {
+      pos.x = (pos.x + 1) % 4;
+      pos.y = (pos.y + 1) % 4;
+      setTilePosition(pos.x, pos.y);
+    }
+  </script>
+</body>
+</html>
