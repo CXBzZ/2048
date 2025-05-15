@@ -51,10 +51,24 @@
         <button id="new-game-button">新游戏</button>
         <button id="undo-button">撤销</button>
         <div id="win-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:100;justify-content:center;align-items:center;">
-          <div style="background:#fff;padding:32px 40px;border-radius:8px;text-align:center;box-shadow:0 2px 16px #0002;">
+          <div style="background:#fff;padding:32px 40px;border-radius:8px;text-align:center;box-shadow:0 2px 16px #0002;min-width:260px;">
             <h2 style="color:#8f7a66;">你赢了！</h2>
             <button id="continue-button" style="margin-top:20px;padding:8px 24px;font-size:18px;">继续游戏</button>
           </div>
+        </div>
+        <div id="gameover-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:100;justify-content:center;align-items:center;">
+          <div style="background:#fff;padding:32px 40px;border-radius:8px;text-align:center;box-shadow:0 2px 16px #0002;min-width:260px;">
+            <h2 style="color:#8f7a66;">游戏结束</h2>
+            <div style="margin:16px 0;">
+              <input id="player-name" type="text" maxlength="12" placeholder="请输入你的名字" style="padding:8px 12px;font-size:16px;width:80%;border:1px solid #ccc;border-radius:4px;">
+            </div>
+            <button id="submit-score" style="padding:8px 24px;font-size:18px;">提交分数</button>
+            <div id="submit-tip" style="color:#e67c73;margin-top:10px;font-size:14px;display:none;"></div>
+          </div>
+        </div>
+        <div class="rank-board" id="rank-board">
+          <h3>排行榜（历史最高分）</h3>
+          <ol id="rank-list"></ol>
         </div>
     </div>
     <script src="script.js"></script>

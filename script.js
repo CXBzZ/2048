@@ -26,6 +26,8 @@ class Game2048 {
         this.mergedTiles = [];
         this.mergeEffects = [];
         this.hasWon = false; // 是否已弹出胜利提示
+        this.rankKey = 'rankBoard'; // 本地排行榜key
+        this.apiUrl = 'https://6825ddb6397e48c91313ed71.mockapi.io/scores'; // 全局排行榜API
         this.init();
     }
 
@@ -47,6 +49,34 @@ class Game2048 {
             this.hasWon = true;
             this.winModal.style.display = 'none';
         };
+        // 游戏结束弹窗相关
+        this.gameoverModal = document.getElementById('gameover-modal');
+        this.submitBtn = document.getElementById('submit-score');
+        this.playerNameInput = document.getElementById('player-name');
+        this.submitTip = document.getElementById('submit-tip');
+        if (this.submitBtn) {
+            this.submitBtn.onclick = async () => {
+                const name = this.playerNameInput.value.trim();
+                if (!name) {
+                    this.submitTip.textContent = '请输入名字';
+                    this.submitTip.style.display = 'block';
+                    return;
+                }
+                this.submitTip.style.display = 'none';
+                this.submitBtn.disabled = true;
+                this.submitBtn.textContent = '提交中...';
+                try {
+                    await this.submitScore(name, this.score);
+                    this.gameoverModal.style.display = 'none';
+                    this.updateRankBoard();
+                } catch (e) {
+                    this.submitTip.textContent = '提交失败，请重试';
+                    this.submitTip.style.display = 'block';
+                }
+                this.submitBtn.disabled = false;
+                this.submitBtn.textContent = '提交分数';
+            };
+        }
         // 触屏滑动支持
         this.addTouchSupport();
     }
@@ -102,7 +132,8 @@ class Game2048 {
         this.addRandomTile();
         this.updateDisplay();
         this.updateTiles();
-        if (this.winModal) this.winModal.style.display = 'none';
+        this.updateRankBoard();
+        if (this.gameoverModal) this.gameoverModal.style.display = 'none';
     }
 
     addRandomTile() {
@@ -220,11 +251,38 @@ class Game2048 {
     updateDisplay() {
         this.scoreDisplay.textContent = this.score;
         this.bestScoreDisplay.textContent = this.bestScore;
-        
         if (this.score > this.bestScore) {
             this.bestScore = this.score;
             localStorage.setItem('bestScore', this.bestScore);
         }
+        this.updateRankBoard();
+    }
+
+    async updateRankBoard() {
+        // 拉取全局排行榜
+        try {
+            const res = await fetch(this.apiUrl + '?sortBy=score&order=desc&limit=10');
+            const rank = await res.json();
+            const rankList = document.getElementById('rank-list');
+            if (rankList) {
+                rankList.innerHTML = '';
+                rank.forEach((item, idx) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${idx + 1}. ${item.name || '匿名'} - ${item.score}`;
+                    rankList.appendChild(li);
+                });
+            }
+        } catch (e) {
+            // 网络异常时不更新
+        }
+    }
+
+    async submitScore(name, score) {
+        await fetch(this.apiUrl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, score, createdAt: new Date().toISOString()})
+        });
     }
 
     handleKeyPress(event) {
@@ -404,6 +462,14 @@ class Game2048 {
             }
         }
         
+        // 游戏结束，弹窗输入名字
+        setTimeout(() => {
+            if (this.gameoverModal) {
+                this.playerNameInput.value = '';
+                this.submitTip.style.display = 'none';
+                this.gameoverModal.style.display = 'flex';
+            }
+        }, 300);
         return true;
     }
 
