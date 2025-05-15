@@ -60,14 +60,18 @@ class Game2048 {
             if (e.touches.length === 1) {
                 startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
+                endX = startX;
+                endY = startY;
             }
-        });
+            e.preventDefault();
+        }, {passive: false});
         gameContainer.addEventListener('touchmove', e => {
             if (e.touches.length === 1) {
                 endX = e.touches[0].clientX;
                 endY = e.touches[0].clientY;
             }
-        });
+            e.preventDefault();
+        }, {passive: false});
         gameContainer.addEventListener('touchend', e => {
             const dx = endX - startX;
             const dy = endY - startY;
@@ -79,7 +83,8 @@ class Game2048 {
                 key = dy > 0 ? 'ArrowDown' : 'ArrowUp';
             }
             this.handleKeyPress({key, preventDefault: () => {}});
-        });
+            e.preventDefault();
+        }, {passive: false});
     }
 
     newGame() {
