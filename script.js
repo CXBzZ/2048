@@ -47,6 +47,39 @@ class Game2048 {
             this.hasWon = true;
             this.winModal.style.display = 'none';
         };
+        // 触屏滑动支持
+        this.addTouchSupport();
+    }
+
+    addTouchSupport() {
+        let startX = 0, startY = 0, endX = 0, endY = 0;
+        const threshold = 30; // 最小滑动距离
+        const gameContainer = document.querySelector('.game-container');
+        if (!gameContainer) return;
+        gameContainer.addEventListener('touchstart', e => {
+            if (e.touches.length === 1) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+        });
+        gameContainer.addEventListener('touchmove', e => {
+            if (e.touches.length === 1) {
+                endX = e.touches[0].clientX;
+                endY = e.touches[0].clientY;
+            }
+        });
+        gameContainer.addEventListener('touchend', e => {
+            const dx = endX - startX;
+            const dy = endY - startY;
+            if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+            let key = '';
+            if (Math.abs(dx) > Math.abs(dy)) {
+                key = dx > 0 ? 'ArrowRight' : 'ArrowLeft';
+            } else {
+                key = dy > 0 ? 'ArrowDown' : 'ArrowUp';
+            }
+            this.handleKeyPress({key, preventDefault: () => {}});
+        });
     }
 
     newGame() {
