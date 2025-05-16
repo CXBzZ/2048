@@ -95,7 +95,13 @@ h1 {
     font-size: 35px;
     font-weight: bold;
     color: #776e65;
-    transition: left 0.18s, top 0.18s, background 0.15s, width 0.15s, height 0.15s;
+    transition: 
+        left 180ms ease, 
+        top 180ms ease, 
+        opacity 120ms ease, 
+        background-color 100ms ease;
+    will-change: top, left, opacity, transform;
+    backface-visibility: hidden;
 }
 
 .tile[data-value="2"] { background: #eee4da; }
@@ -138,7 +144,8 @@ h1 {
 }
 
 .tile.merge-animate {
-  animation: merge-animate 0.18s;
+  animation: merge-animate 180ms ease;
+  z-index: 5;
 }
 
 @keyframes new-tile-animate {
@@ -148,7 +155,7 @@ h1 {
 }
 
 .tile.new-tile {
-  animation: new-tile-animate 0.28s;
+  animation: new-tile-animate 280ms ease;
   z-index: 3;
 }
 

@@ -12,6 +12,7 @@ class Game2048 {
         this.scoreDisplay = document.getElementById('score');
         this.bestScoreDisplay = document.getElementById('best-score');
         this.newGameButton = document.getElementById('new-game-button');
+        this.undoButton = document.getElementById('undo-button');
         // 获取格子宽度和gap
         const cell = document.querySelector('.grid-cell');
         const cellRect = cell.getBoundingClientRect();
@@ -23,6 +24,7 @@ class Game2048 {
         this.tileIds = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(null)); // 记录每个格子的tile唯一id
         this.nextTileId = 1; // 自增id
         this.history = []; // 用于撤销
+        this.undoCount = 1; // 撤回次数
         this.mergedTiles = [];
         this.mergeEffects = [];
         this.hasWon = false; // 是否已弹出胜利提示
@@ -40,8 +42,10 @@ class Game2048 {
         document.addEventListener('keydown', this.handleKeyPress.bind(this));
         this.newGameButton.addEventListener('click', () => this.newGame());
         // 撤销按钮
-        const undoBtn = document.getElementById('undo-button');
-        if (undoBtn) undoBtn.addEventListener('click', () => this.undo());
+        if (this.undoButton) {
+            this.undoButton.addEventListener('click', () => this.undo());
+            this.updateUndoButton();
+        }
         // 胜利弹窗
         this.winModal = document.getElementById('win-modal');
         this.continueBtn = document.getElementById('continue-button');
@@ -135,11 +139,13 @@ class Game2048 {
         this.mergeEffects = [];
         this.hasWon = false;
         this.history = [];
+        this.undoCount = 1; // 重置撤回次数
         this.addRandomTile();
         this.addRandomTile();
         this.updateDisplay();
         this.updateTiles();
         this.updateRankBoard();
+        this.updateUndoButton(); // 更新撤回按钮状态
         if (this.gameoverModal) this.gameoverModal.style.display = 'none';
     }
 
@@ -194,11 +200,24 @@ class Game2048 {
                 if (this.grid[i][j] !== 0 && id) {
                     usedIds.add(id);
                     const tile = this.tiles[id];
-                    // 只在位置变化时才更新
+                    if (!tile) continue; // 跳过不存在的tile
+                    
+                    // 计算新位置
                     const left = (j * (this.cellSize + this.gap)) + 'px';
                     const top = (i * (this.cellSize + this.gap)) + 'px';
-                    if (tile.style.left !== left) tile.style.left = left;
-                    if (tile.style.top !== top) tile.style.top = top;
+                    
+                    // 使用transform来实现更流畅的动画
+                    const oldLeft = tile.style.left;
+                    const oldTop = tile.style.top;
+                    
+                    // 只在位置变化时才更新
+                    if (oldLeft !== left || oldTop !== top) {
+                        // 添加过渡动画
+                        tile.style.transition = `top ${ANIMATION_DURATION}ms ease, left ${ANIMATION_DURATION}ms ease`;
+                        tile.style.left = left;
+                        tile.style.top = top;
+                    }
+                    
                     // 合并动画延迟处理
                     if (this.mergedTiles && this.mergedTiles.some(pos => pos.x === i && pos.y === j)) {
                         // 记录需要延迟更新的目标tile
@@ -213,44 +232,82 @@ class Game2048 {
                 }
             }
         }
+        
         // 处理被合并tile的滑动和延迟移除
-        if (this.mergeEffects) {
+        if (this.mergeEffects && this.mergeEffects.length > 0) {
             for (const effect of this.mergeEffects) {
                 const tile = this.tiles[effect.from.id];
                 if (tile) {
-                    tile.style.left = (effect.to.y * (this.cellSize + this.gap)) + 'px';
-                    tile.style.top = (effect.to.x * (this.cellSize + this.gap)) + 'px';
+                    // 将被合并的tile移动到目标位置
+                    const left = (effect.to.y * (this.cellSize + this.gap)) + 'px';
+                    const top = (effect.to.x * (this.cellSize + this.gap)) + 'px';
+                    
+                    // 添加过渡动画
+                    tile.style.transition = `top ${ANIMATION_DURATION}ms ease, left ${ANIMATION_DURATION}ms ease, opacity ${ANIMATION_DURATION/2}ms ease`;
+                    tile.style.left = left;
+                    tile.style.top = top;
                     tile.style.zIndex = 4;
+                    
+                    // 动画完成后淡出并移除
                     setTimeout(() => {
-                        tile.classList.add('fade-out');
-                        tile.addEventListener('transitionend', function handler() {
-                            if (tile.parentNode) tile.parentNode.removeChild(tile);
-                            delete this.tiles[effect.from.id];
-                            tile.removeEventListener('transitionend', handler);
+                        tile.style.opacity = 0;
+                        tile.addEventListener('transitionend', function handler(e) {
+                            if (e.propertyName === 'opacity' && tile.parentNode) {
+                                tile.parentNode.removeChild(tile);
+                                delete this.tiles[effect.from.id];
+                                tile.removeEventListener('transitionend', handler);
+                            }
                         }.bind(this));
                     }, ANIMATION_DURATION); // 等滑动动画结束后再淡出
                 }
             }
         }
+        
         // 延迟更新目标tile的数字和动画
         setTimeout(() => {
             for (const {tile, value} of delayedMerge) {
+                // 确保tile仍然存在
+                if (!tile || !tile.parentNode) continue;
+                
+                // 更新数字
                 tile.textContent = value;
                 tile.setAttribute('data-value', value);
+                
+                // 添加合并动画效果
                 tile.classList.add('merge-animate');
+                
+                // 动画结束后移除动画类
                 tile.addEventListener('animationend', function handler() {
                     tile.classList.remove('merge-animate');
                     tile.removeEventListener('animationend', handler);
                 });
             }
         }, ANIMATION_DURATION + 10); // 等被合并tile淡出后再更新
+        
         // 移除消失的tile
         for (const id in this.tiles) {
             if (!usedIds.has(Number(id))) {
                 // 如果已经在mergeEffects里处理过就不再移除
                 if (this.mergeEffects && this.mergeEffects.some(e => e.from.id == id)) continue;
-                this.tiles[id].remove();
-                delete this.tiles[id];
+                
+                // 添加淡出效果
+                const tile = this.tiles[id];
+                if (tile && tile.parentNode) {
+                    tile.style.transition = `opacity ${ANIMATION_DURATION/2}ms ease`;
+                    tile.style.opacity = 0;
+                    
+                    // 动画结束后移除元素
+                    tile.addEventListener('transitionend', function handler(e) {
+                        if (e.propertyName === 'opacity' && tile.parentNode) {
+                            tile.parentNode.removeChild(tile);
+                            delete this.tiles[id];
+                            tile.removeEventListener('transitionend', handler);
+                        }
+                    }.bind(this));
+                } else {
+                    // 如果没有父节点，直接删除引用
+                    delete this.tiles[id];
+                }
             }
         }
     }
@@ -273,7 +330,8 @@ class Game2048 {
             const rankList = document.getElementById('rank-list');
             if (rankList) {
                 rankList.innerHTML = '';
-                rank.forEach((item) => {
+                // 只显示前五名
+                rank.slice(0, 5).forEach((item, index) => {
                     const li = document.createElement('li');
                     li.textContent = `${item.name || '匿名'} - ${item.score}`;
                     rankList.appendChild(li);
@@ -298,7 +356,7 @@ class Game2048 {
         const oldGrid = JSON.stringify(this.grid);
         const oldTileIds = this.tileIds.map(row => row.slice());
         let moved = false;
-        // 撤销快照
+        // 在移动前保存历史记录
         this.saveHistory();
         switch(event.key) {
             case 'ArrowLeft': moved = this.moveLeft(); break;
@@ -320,24 +378,45 @@ class Game2048 {
         this.mergedTiles = [];
         this.mergeEffects = [];
         for (let i = 0; i < GRID_SIZE; i++) {
+            // 筛选出非零单元格及其ID
             let row = this.grid[i].filter(cell => cell !== 0);
-            let ids = this.tileIds[i].filter(id => id !== null);
+            let ids = this.tileIds[i].filter((id, idx) => this.grid[i][idx] !== 0);
+            
+            // 记录原始位置，用于追踪移动
+            let originalPositions = [];
+            for (let j = 0; j < GRID_SIZE; j++) {
+                if (this.grid[i][j] !== 0) {
+                    originalPositions.push({value: this.grid[i][j], id: this.tileIds[i][j], pos: j});
+                }
+            }
+            
+            // 合并相同数字
             for (let j = 0; j < row.length - 1; j++) {
                 if (row[j] === row[j + 1]) {
                     row[j] *= 2;
                     this.score += row[j];
-                    // 记录被合并tile的信息
+                    
+                    // 记录要被合并的tile的原始位置
+                    const sourcePos = originalPositions[j + 1].pos;
+                    const targetPos = j; // 合并后的位置
+                    
                     this.mergeEffects.push({
-                        from: {x: i, y: j + 1, id: ids[j + 1]},
-                        to: {x: i, y: j, id: ids[j]}
+                        from: {x: i, y: sourcePos, id: ids[j + 1]},
+                        to: {x: i, y: targetPos, id: ids[j]}
                     });
+                    
                     row.splice(j + 1, 1);
                     ids.splice(j + 1, 1);
+                    originalPositions.splice(j + 1, 1);
                     this.mergedTiles.push({x: i, y: j});
                 }
             }
+            
+            // 填充剩余空间
             while (row.length < GRID_SIZE) row.push(0);
             while (ids.length < GRID_SIZE) ids.push(null);
+            
+            // 检查是否发生移动
             if (JSON.stringify(this.grid[i]) !== JSON.stringify(row)) moved = true;
             this.grid[i] = row;
             this.tileIds[i] = ids;
@@ -350,24 +429,47 @@ class Game2048 {
         this.mergedTiles = [];
         this.mergeEffects = [];
         for (let i = 0; i < GRID_SIZE; i++) {
+            // 筛选出非零单元格及其ID
             let row = this.grid[i].filter(cell => cell !== 0);
-            let ids = this.tileIds[i].filter(id => id !== null);
+            let ids = this.tileIds[i].filter((id, idx) => this.grid[i][idx] !== 0);
+            
+            // 记录原始位置，用于追踪移动
+            let originalPositions = [];
+            for (let j = 0; j < GRID_SIZE; j++) {
+                if (this.grid[i][j] !== 0) {
+                    originalPositions.push({value: this.grid[i][j], id: this.tileIds[i][j], pos: j});
+                }
+            }
+            
+            // 合并相同数字（从右向左）
             for (let j = row.length - 1; j > 0; j--) {
                 if (row[j] === row[j - 1]) {
                     row[j] *= 2;
                     this.score += row[j];
+                    
+                    // 记录要被合并的tile的原始位置
+                    const sourcePos = originalPositions[j - 1].pos;
+                    // 计算合并后的新位置（在右侧）
+                    const targetPos = GRID_SIZE - (row.length - j);
+                    
                     this.mergeEffects.push({
-                        from: {x: i, y: j - 1, id: ids[j - 1]},
-                        to: {x: i, y: j, id: ids[j]}
+                        from: {x: i, y: sourcePos, id: ids[j - 1]},
+                        to: {x: i, y: targetPos, id: ids[j]}
                     });
+                    
                     row.splice(j - 1, 1);
                     ids.splice(j - 1, 1);
-                    this.mergedTiles.push({x: i, y: j});
-                    j--;
+                    originalPositions.splice(j - 1, 1);
+                    this.mergedTiles.push({x: i, y: targetPos});
+                    j--; // 跳过已合并的元素
                 }
             }
+            
+            // 填充左侧空白
             while (row.length < GRID_SIZE) row.unshift(0);
             while (ids.length < GRID_SIZE) ids.unshift(null);
+            
+            // 检查是否发生移动
             if (JSON.stringify(this.grid[i]) !== JSON.stringify(row)) moved = true;
             this.grid[i] = row;
             this.tileIds[i] = ids;
@@ -381,27 +483,44 @@ class Game2048 {
         this.mergeEffects = [];
         for (let j = 0; j < GRID_SIZE; j++) {
             let column = [], ids = [];
+            
+            // 记录原始位置，用于追踪移动
+            let originalPositions = [];
             for (let i = 0; i < GRID_SIZE; i++) {
                 if (this.grid[i][j] !== 0) {
                     column.push(this.grid[i][j]);
                     ids.push(this.tileIds[i][j]);
+                    originalPositions.push({value: this.grid[i][j], id: this.tileIds[i][j], pos: i});
                 }
             }
+            
+            // 合并相同数字（从上到下）
             for (let i = 0; i < column.length - 1; i++) {
                 if (column[i] === column[i + 1]) {
                     column[i] *= 2;
                     this.score += column[i];
+                    
+                    // 记录要被合并的tile的原始位置
+                    const sourcePos = originalPositions[i + 1].pos;
+                    const targetPos = i; // 合并后的位置
+                    
                     this.mergeEffects.push({
-                        from: {x: i + 1, y: j, id: ids[i + 1]},
-                        to: {x: i, y: j, id: ids[i]}
+                        from: {x: sourcePos, y: j, id: ids[i + 1]},
+                        to: {x: targetPos, y: j, id: ids[i]}
                     });
+                    
                     column.splice(i + 1, 1);
                     ids.splice(i + 1, 1);
+                    originalPositions.splice(i + 1, 1);
                     this.mergedTiles.push({x: i, y: j});
                 }
             }
+            
+            // 填充剩余空间
             while (column.length < GRID_SIZE) column.push(0);
             while (ids.length < GRID_SIZE) ids.push(null);
+            
+            // 更新网格
             for (let i = 0; i < GRID_SIZE; i++) {
                 if (this.grid[i][j] !== column[i]) moved = true;
                 this.grid[i][j] = column[i];
@@ -417,28 +536,46 @@ class Game2048 {
         this.mergeEffects = [];
         for (let j = 0; j < GRID_SIZE; j++) {
             let column = [], ids = [];
+            
+            // 记录原始位置，用于追踪移动
+            let originalPositions = [];
             for (let i = 0; i < GRID_SIZE; i++) {
                 if (this.grid[i][j] !== 0) {
                     column.push(this.grid[i][j]);
                     ids.push(this.tileIds[i][j]);
+                    originalPositions.push({value: this.grid[i][j], id: this.tileIds[i][j], pos: i});
                 }
             }
+            
+            // 合并相同数字（从下到上）
             for (let i = column.length - 1; i > 0; i--) {
                 if (column[i] === column[i - 1]) {
                     column[i] *= 2;
                     this.score += column[i];
+                    
+                    // 记录要被合并的tile的原始位置
+                    const sourcePos = originalPositions[i - 1].pos;
+                    // 计算合并后的新位置（在底部）
+                    const targetPos = GRID_SIZE - (column.length - i);
+                    
                     this.mergeEffects.push({
-                        from: {x: i - 1, y: j, id: ids[i - 1]},
-                        to: {x: i, y: j, id: ids[i]}
+                        from: {x: sourcePos, y: j, id: ids[i - 1]},
+                        to: {x: targetPos, y: j, id: ids[i]}
                     });
+                    
                     column.splice(i - 1, 1);
                     ids.splice(i - 1, 1);
-                    this.mergedTiles.push({x: i, y: j});
-                    i--;
+                    originalPositions.splice(i - 1, 1);
+                    this.mergedTiles.push({x: targetPos, y: j});
+                    i--; // 跳过已合并的元素
                 }
             }
+            
+            // 填充顶部空白
             while (column.length < GRID_SIZE) column.unshift(0);
             while (ids.length < GRID_SIZE) ids.unshift(null);
+            
+            // 更新网格
             for (let i = 0; i < GRID_SIZE; i++) {
                 if (this.grid[i][j] !== column[i]) moved = true;
                 this.grid[i][j] = column[i];
@@ -500,8 +637,21 @@ class Game2048 {
         });
     }
 
+    updateUndoButton() {
+        if (!this.undoButton) return;
+        this.undoButton.textContent = `撤销 (${this.undoCount})`;
+        this.undoButton.disabled = this.undoCount === 0;
+        if (this.undoCount === 0) {
+            this.undoButton.style.opacity = '0.5';
+            this.undoButton.style.cursor = 'not-allowed';
+        } else {
+            this.undoButton.style.opacity = '1';
+            this.undoButton.style.cursor = 'pointer';
+        }
+    }
+
     undo() {
-        if (!this.history.length) return;
+        if (!this.history.length || this.undoCount === 0) return;
         const last = this.history.pop();
         this.grid = last.grid.map(row => row.slice());
         this.tileIds = last.tileIds.map(row => row.slice());
@@ -509,8 +659,21 @@ class Game2048 {
         this.bestScore = last.bestScore;
         this.nextTileId = last.nextTileId;
         this.hasWon = false;
+        
+        // 清空并重建所有tile
+        this.tileContainer.innerHTML = '';
+        this.tiles = {};
+        for (let i = 0; i < GRID_SIZE; i++) {
+            for (let j = 0; j < GRID_SIZE; j++) {
+                if (this.grid[i][j] !== 0) {
+                    this.createTile(i, j, this.grid[i][j], this.tileIds[i][j]);
+                }
+            }
+        }
+        
+        this.undoCount = 0; // 使用撤回次数
+        this.updateUndoButton(); // 更新按钮状态
         this.updateDisplay();
-        this.updateTiles();
     }
 }
 
