@@ -79,6 +79,13 @@ class Game2048 {
         }
         // 触屏滑动支持
         this.addTouchSupport();
+        this.skipBtn = document.getElementById('skip-score');
+        if (this.skipBtn) {
+            this.skipBtn.onclick = () => {
+                this.gameoverModal.style.display = 'none';
+                this.newGame();
+            };
+        }
     }
 
     addTouchSupport() {
@@ -261,14 +268,14 @@ class Game2048 {
     async updateRankBoard() {
         // 拉取全局排行榜
         try {
-            const res = await fetch(this.apiUrl + '?sortBy=score&order=desc&limit=10');
+            const res = await fetch(this.apiUrl + '?sortBy=score&order=desc&limit=5');
             const rank = await res.json();
             const rankList = document.getElementById('rank-list');
             if (rankList) {
                 rankList.innerHTML = '';
-                rank.forEach((item, idx) => {
+                rank.forEach((item) => {
                     const li = document.createElement('li');
-                    li.textContent = `${idx + 1}. ${item.name || '匿名'} - ${item.score}`;
+                    li.textContent = `${item.name || '匿名'} - ${item.score}`;
                     rankList.appendChild(li);
                 });
             }
@@ -287,12 +294,10 @@ class Game2048 {
 
     handleKeyPress(event) {
         if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-        
         event.preventDefault();
         const oldGrid = JSON.stringify(this.grid);
         const oldTileIds = this.tileIds.map(row => row.slice());
         let moved = false;
-        
         // 撤销快照
         this.saveHistory();
         switch(event.key) {
@@ -301,15 +306,12 @@ class Game2048 {
             case 'ArrowUp': moved = this.moveUp(); break;
             case 'ArrowDown': moved = this.moveDown(); break;
         }
-        
         if (oldGrid !== JSON.stringify(this.grid) || moved) {
             this.updateTiles();
             this.addRandomTile();
             this.updateDisplay();
             this.checkWin();
-            if (this.isGameOver()) {
-                alert('游戏结束！');
-            }
+            this.isGameOver(); // 只弹自定义弹窗，不再alert
         }
     }
 
